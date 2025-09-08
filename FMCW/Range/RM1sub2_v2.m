@@ -3,7 +3,7 @@
 %clc;
 
 %% Get data
-[data, Fs] = audioread("Range_Test_File2.m4a");  % user file
+[data, Fs] = audioread("Range_Test_File2.wav");  % user file
 
 % Constants
 Tp = 5e-3;                 % s
@@ -74,15 +74,16 @@ radar_up_2MTI = range_up_CR(2:end, :) - range_up_CR(1:end-1, :);
 radar_up_3MTI = range_up_CR(3:end, :) - 2*range_up_CR(2:end-1, :) + range_up_CR(1:end-2, :);
 
 %% IFFT
-df = Fs / (4*N);                 % frequency bin width
-freq_bins = (0:(4*N-1)) * df;    % full FFT freq axis
-take_bins = 1:(4*N/2);           % take lower half (0..Fs/2 - df)
+pad_factor = 8;
+df = Fs / (pad_factor*N);                 % frequency bin width
+freq_bins = (0:(pad_factor*N-1)) * df;    % full FFT freq axis
+take_bins = 1:(pad_factor*N/2);           % take lower half (0..Fs/2 - df)
 
 
-Y_raw = ifft(matrix_radar_up, 4*N, 2);           % M x (4*N)
-Y_CR  = ifft(range_up_CR, 4*N, 2);               % M x (4*N)
-Y_2MTI = ifft(radar_up_2MTI, 4*N, 2);            % (M-1) x (4*N)
-Y_3MTI = ifft(radar_up_3MTI, 4*N, 2);            % (M-2) x (4*N)
+Y_raw = ifft(matrix_radar_up, pad_factor*N, 2);           % M x (4*N)
+Y_CR  = ifft(range_up_CR, pad_factor*N, 2);               % M x (4*N)
+Y_2MTI = ifft(radar_up_2MTI, pad_factor*N, 2);            % (M-1) x (4*N)
+Y_3MTI = ifft(radar_up_3MTI, pad_factor*N, 2);            % (M-2) x (4*N)
 
 % Convert to dB (use abs + eps)
 Y_raw_dB = 20*log10(abs(Y_raw));
@@ -131,7 +132,7 @@ set(gca,'YDir','reverse');
 xlim([0 100]);
 xlabel('Range (m)');
 ylabel('Time (s)');
-title('Range without MS and no MTI, Tp=5ms, fstart=2.405GHz, fstop=2.495GHz');
+title('Range no MS and no MTI, Tp=5ms, fstart=2.405GHz, fstop=2.495GHz');
 
 figure(2);
 imagesc(range_axis, t_up, Yup_CR_dB_norm, [-50 0]);
@@ -162,5 +163,6 @@ xlim([0 100]);
 xlabel('Range (m)');
 ylabel('Time (s)');
 title('Range with MS and 3-pulse MTI, Tp=5ms, fstart=2.405GHz, fstop=2.495GHz');
+
 
 

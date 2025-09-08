@@ -3,7 +3,7 @@ clear;
 clc;
 
 %% Get datas
-[data, Fs] = audioread("Range_Test_File2.m4a");
+[data, Fs] = audioread("Range_Test_File2.wav");
 
 Tp = 5e-3; % ms
 start_freq = 2.405e9; % Hz
