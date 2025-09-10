@@ -3,7 +3,7 @@ clear;
 clc;
 
 %% Get datas
-[data, Fs] = audioread("Velocity_Test_File2.wav");
+[data, Fs] = audioread("Velocity_Test_File2.m4a");
 
 Tp = 0.1;
 fc = 2.445e9;
