@@ -3,7 +3,7 @@
 %clc;
 
 %% Get data
-[data, Fs] = audioread("Range_Test_File2.m4a");  % user file
+[data, Fs] = audioread("test1_17_09.wav");  % user file
 
 % Constants
 Tp = 5e-3;                 % s
