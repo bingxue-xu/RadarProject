@@ -6,7 +6,7 @@ clear;
 clc;
 
 %% Read data
-[data, Fs] = audioread("TEST_FILES18/test1_17_09.wav");
+[data, Fs] = audioread("TEST_FILES_19/FMCW_19_t2_1.wav");
 
 % constants
 Tp = 5e-3;            % s
@@ -120,15 +120,18 @@ saveas(gcf, 'FMCW_plots/RM3_2_range_FMCW.png');
 %% RM3
 %% choose chirps and number of targets
 chosen = 10:30;   % change here
+
 %% RM3 with tracking
 num_targets = 2;          % track up to 2 targets
 range_tracks = nan(M-1, num_targets);
 
+% %% RM3 Nearest Neighber Assignment
 min_sep_bin  = 20;        % minimum bin separation within chirp
-max_mov_bin  = 5;        % maximum movement allowed between chirps (bins)
-
+max_mov_bin  = 2;        % maximum movement allowed between chirps (bins)
+max_miss_allowed = 100;
 % tracker state
 last_bins = nan(1, num_targets);   % last known bin index for each target
+miss_count = zeros(1, num_targets); % consecutive miss counter
 
 for m = 1:M-1
     row_data = Y_2MTI_dB_half_norm(m,:);
@@ -137,6 +140,8 @@ for m = 1:M-1
     [pks, locs] = findpeaks(row_data, ...
         'MinPeakDistance', min_sep_bin);
 
+    threshold_dB = -25;  % detection threshold
+    pks = pks > threshold_dB;
     if isempty(pks)
         continue;
     end
@@ -155,93 +160,179 @@ for m = 1:M-1
             diffs = abs(locs_sorted - last_bins(id));
             [min_diff, idx] = min(diffs);
 
-            if min_diff <= max_mov_bin
+            if min_diff <= max_mov_bin && ~used(idx)
                 range_tracks(m,id) = range_axis(locs_sorted(idx));
                 last_bins(id) = locs_sorted(idx);
                 used(idx) = true;
                 assigned = true;
+                miss_count(id) =0;
+            else
+                % no close detection
+                miss_count(id) = miss_count(id) + 1;
+                % range_tracks(m, id) = nan;
+                if miss_count(id) >= max_miss_allowed
+                    % range_tracks(m,id) = nan;
+                    % reinitialize after too many misses
+                    idx = find(~used,1,'first');
+                    if ~isempty(idx)
+                        range_tracks(m,id) = range_axis(locs_sorted(idx));
+                        last_bins(id) = locs_sorted(idx);
+                        used(idx) = true;
+                        assigned = true;
+                        miss_count(id) = 0; % reset after reinit
+                    else
+                        % still nothing → keep NaN this frame
+                        range_tracks(m,id) = nan;
+                    end
+                else
+                    % within allowed miss window → keep last bin, no update
+                    range_tracks(m,id) = nan;
+                end
             end
-        end
-
-        % if not assigned, pick the strongest unused candidate
-        if ~assigned
+        else
+            % first-time init (no history yet)
             idx = find(~used,1,'first');
             if ~isempty(idx)
                 range_tracks(m,id) = range_axis(locs_sorted(idx));
                 last_bins(id) = locs_sorted(idx);
                 used(idx) = true;
+                miss_count(id) = 0;
             end
         end
     end
 end
 
+% %% RM3 Hungarian Assignment
+% 
+% min_sep_bin  = 20;        % minimum bin separation within chirp
+% max_mov_bin  = 5;        % maximum movement allowed between chirps (bins)
+% max_miss_allowed = 10;
+% % tracker state
+% last_bins = nan(1, num_targets);   % track states (row of cost matrix)
+% miss_count = zeros(1, num_targets); % consecutive miss counter
+% 
+% for m = 1:M-1
+%     row_data = Y_2MTI_dB_half_norm(m,:);
+% 
+%     % Step 1: find separated peaks in this chirp
+%     [pks, locs] = findpeaks(row_data, ...
+%         'MinPeakDistance', min_sep_bin);
+% 
+%     if isempty(pks)
+%         continue;
+%     end
+% 
+%     % sort candidates by strength (descending)
+%     [~, order] = sort(pks,'descend');
+%     locs_sorted = locs(order); % detections (indices of bins)(columns of cost matrix)
+% 
+%     %% build cost matrix
+%     num_detections = numel(locs_sorted);
+%     costMatrix = Inf(num_targets, num_detections);
+% 
+%     for i = 1:num_targets
+%         if ~isnan(last_bins(i))
+%             for j=1:num_detections
+%                 diff = abs(last_bins(i) - locs_sorted(j));
+%                 if diff <= max_mov_bin
+%                     costMatrix(i, j) = diff; % smaller = better match
+%                 end
+%             end
+%         end
+%     end
+% 
+%     %% Hungarian assignment
+%     % assignments = Nx2 array [trackIdx, detectionIdx]
+%     % unassignedTracks = tracks with no assigned detection
+%     % unassignedDetections = detections left unused
+%     [assignments, unassignedTracks, unassignedDetections] = ...
+%         assignDetectionsToTracks(costMatrix, max_mov_bin);
+% 
+%     %% Update states
+%     for k = 1:size(assignments,1)
+%         id = assignment(k,1);
+%         idx = assignment(k,2);
+%         range_tracks(m,id) = range_axis(locs_sorted(idx));
+%         last_bins(id) = locs_sorted(idx);
+%         miss_count(id) = 0;
+%     end
+% end
+
 
 %% scatterer per chirp
 [max_vals, idx_max] = max(Y_2MTI_dB_half_norm, [], 2); 
 
-%% (1) Captured data & sync for chosen chirps
-figure('Name','RM3_captured_target');
-hold on;
-for i = 1:length(chosen)
-    m = chosen(i);
-    seg_t = (start_idx(m):start_idx(m)+N-1)/Fs;
-    seg_radar = radar_data(start_idx(m):start_idx(m)+N-1);
-    seg_sync  = sync_data(start_idx(m):start_idx(m)+N-1);
-
-    plot(seg_t, seg_radar,'b');
-    plot(seg_t, seg_sync,'r');
-end
-xlabel('Time (s)'); ylabel('Amplitude');
-title(sprintf('Radar Data & Sync (Chirps %d to %d)', chosen(1), chosen(end)));
-grid on;
-legend('Radar Backscatter','Sync Signal');
-saveas(gcf,'FMCW_plots/RM3_captured_chosen.png');
-
-%% (2) Overlay radar + sync for chosen chirps
-figure('Name','RM3_overlay');
-for i = 1:length(chosen)
-    m = chosen(i);
-    seg_t = (start_idx(m):start_idx(m)+N-1)/Fs;
-    seg_radar = radar_data(start_idx(m):start_idx(m)+N-1);
-    seg_sync  = sync_data(start_idx(m):start_idx(m)+N-1);
-
-    yyaxis left
-    plot(seg_t, seg_radar, 'b'); ylabel('Radar Data');
-    yyaxis right
-    plot(seg_t, seg_sync, 'r'); ylim([0 1]); ylabel('Sync Signal');
-end
-xlabel('Time (s)');
-title(sprintf('Overlay Radar & Sync (Chirps %d to %d)', chosen(1), chosen(end)));
-grid on;
-saveas(gcf,'FMCW_plots/RM3_overlay_chosen.png');
+% %% (1) Captured data & sync for chosen chirps
+% figure('Name','RM3_captured_target');
+% hold on;
+% for i = 1:length(chosen)
+%     m = chosen(i);
+%     seg_t = (start_idx(m):start_idx(m)+N-1)/Fs;
+%     seg_radar = radar_data(start_idx(m):start_idx(m)+N-1);
+%     seg_sync  = sync_data(start_idx(m):start_idx(m)+N-1);
+% 
+%     plot(seg_t, seg_radar,'b');
+%     plot(seg_t, seg_sync,'r');
+% end
+% xlabel('Time (s)'); ylabel('Amplitude');
+% title(sprintf('Radar Data & Sync (Chirps %d to %d)', chosen(1), chosen(end)));
+% grid on;
+% legend('Radar Backscatter','Sync Signal');
+% saveas(gcf,'FMCW_plots/RM3_captured_chosen.png');
+% 
+% %% (2) Overlay radar + sync for chosen chirps
+% figure('Name','RM3_overlay');
+% for i = 1:length(chosen)
+%     m = chosen(i);
+%     seg_t = (start_idx(m):start_idx(m)+N-1)/Fs;
+%     seg_radar = radar_data(start_idx(m):start_idx(m)+N-1);
+%     seg_sync  = sync_data(start_idx(m):start_idx(m)+N-1);
+% 
+%     yyaxis left
+%     plot(seg_t, seg_radar, 'b'); ylabel('Radar Data');
+%     yyaxis right
+%     plot(seg_t, seg_sync, 'r'); ylim([0 1]); ylabel('Sync Signal');
+% end
+% xlabel('Time (s)');
+% title(sprintf('Overlay Radar & Sync (Chirps %d to %d)', chosen(1), chosen(end)));
+% grid on;
+% saveas(gcf,'FMCW_plots/RM3_overlay_chosen.png');
 
 %% (3) Range vs Time (all strongest scatterers track)
 figure('Name','RM3_range_vs_time');
-plot(t_2MTI, range_tracks(:,1),'ro'); hold on;
+
+plot(range_tracks(:,1), t_2MTI,'ro'); hold on;
 if num_targets >= 2
-    plot(t_2MTI, range_tracks(:,2),'cx');
+    plot(range_tracks(:,2), t_2MTI,'cx');
 end
-% plot(t_2MTI(chosen), range_track(chosen),'ro','MarkerSize',4,'LineWidth',1.5);
-xlabel('Time (s)'); ylabel('Range (m)');
+set(gca,'YDir','reverse');
+ylabel('Time (s)'); 
+xlabel('Range (m)');
 title(sprintf('Range vs Time (%d Strongest Scatterers)', num_targets));
+
 legend_strings = arrayfun(@(k) sprintf('Target %d',k),1:num_targets,'UniformOutput',false);
 legend(legend_strings);
 grid on;
-saveas(gcf,'FMCW_plots/RM3_range_vs_time_multi.png');
+saveas(gcf,'FMCW_plots/RM3_time_vs_range_multi.png');  % file renamed
+
 
 %% (4) Range-Time Spectrogram + strongest target
 figure('Name','RM3_spectrogram');
-imagesc(t_2MTI, range_axis, Y_2MTI_dB_half_norm.',[-50 0]); 
+
+imagesc(range_axis, t_2MTI, Y_2MTI_dB_half_norm, [-50 0]); 
 axis xy; colorbar;
-xlabel('Time (s)'); ylabel('Range (m)');
-ylim([-Inf 30]);
+set(gca,'YDir','reverse');
+xlabel('Range (m)'); 
+ylabel('Time (s)');
+xlim([0 60]);
+
 title(sprintf('Range-Time Spectrogram with %d Targets', num_targets));
 hold on;
-plot(t_2MTI, range_tracks(:,1),'ro');
 
-% plot(t_2MTI(chosen), range_track(chosen),'ro','MarkerSize',4,'LineWidth',1.5);
+plot(range_tracks(:,1), t_2MTI,'ro');
 if num_targets >= 2
-    plot(t_2MTI, range_tracks(:,2),'cx');
+    plot(range_tracks(:,2), t_2MTI,'cx');
 end
+
 legend(legend_strings);
-saveas(gcf,'FMCW_plots/RM3_range_vs_time_multi.png');
+saveas(gcf,'FMCW_plots/RM3_time_vs_range_multi.png');
