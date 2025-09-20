@@ -122,181 +122,192 @@ saveas(gcf, 'FMCW_plots/RM3_2_range_FMCW.png');
 chosen = 10:30;   % change here
 
 %% RM3 with tracking
-num_targets = 2;          % track up to 2 targets
+%% --------- Tracking (Nearest Neighbor with gated re-init, bin version) ----------
+num_targets = 2;
 range_tracks = nan(M-1, num_targets);
 
-% %% RM3 Nearest Neighber Assignment
-min_sep_bin  = 20;        % minimum bin separation within chirp
-max_mov_bin  = 2;        % maximum movement allowed between chirps (bins)
-max_miss_allowed = 100;
+% 用 bin 直接设置参数
+min_sep_bin  = 20;     % 峰最小分离，bin
+max_mov_bin  = 10;      % 相邻帧最大移动，bin
+max_miss_allowed = 10;  % 可调，小一些让轨迹更稳
+threshold_dB = -25;
+min_dist_between_targets = 5; % minimum distance between targets in bins
 % tracker state
-last_bins = nan(1, num_targets);   % last known bin index for each target
-miss_count = zeros(1, num_targets); % consecutive miss counter
+last_bins  = nan(1, num_targets);
+miss_count = zeros(1, num_targets);
 
 for m = 1:M-1
-    row_data = Y_2MTI_dB_half_norm(m,:);
+    % —— 行内归一化 + 自适应阈值（相对本行最大值）——
+    row = Y_2MTI_dB_half_norm(m,:);  % 已经归一化过（全局）
 
     % Step 1: find separated peaks in this chirp
-    [pks, locs] = findpeaks(row_data, ...
-        'MinPeakDistance', min_sep_bin);
+    [pks, locs] = findpeaks(row, 'MinPeakDistance', min_sep_bin);
 
-    threshold_dB = -25;  % detection threshold
-    pks = pks > threshold_dB;
+    % 只保留超过阈值的峰
+    valid = pks > threshold_dB;
+    pks = pks(valid);  locs = locs(valid);
+
     if isempty(pks)
+        % 本帧无有效探测
+        miss_count = miss_count + 1;
         continue;
     end
 
-    % sort candidates by strength (descending)
+    % 如果目标数少于 num_targets，就只跟踪实际数量
+    num_detections = numel(pks);
+    num_to_assign = min(num_targets, num_detections);
+
+    % sort candidates by strength
     [~, order] = sort(pks,'descend');
-    locs_sorted = locs(order);
+    locs_sorted = locs(order(1:num_to_assign));
+    pks_sorted  = pks(order(1:num_to_assign));
 
-    % Step 2: assign to each target ID
     used = false(size(locs_sorted));
-    for id = 1:num_targets
-        assigned = false;
 
+    % 初始化：拿前 num_targets 个强峰
+    if all(isnan(last_bins))
+        for id = 1:num_targets
+            if id <= num_to_assign
+                last_bins(id)      = locs_sorted(id);
+                range_tracks(m,id) = range_axis(locs_sorted(id));
+                used(id)           = true;
+                miss_count(id)     = 0;
+            end
+        end
+        continue;
+    end
+
+    % 更新 / reinit
+    for id = 1:num_targets
         if ~isnan(last_bins(id))
-            % try to find a candidate close to last known bin
             diffs = abs(locs_sorted - last_bins(id));
             [min_diff, idx] = min(diffs);
 
             if min_diff <= max_mov_bin && ~used(idx)
+                % 检查和另一个目标的距离
+                if id == 2 && ~isnan(last_bins(1)) ...
+                        && abs(locs_sorted(idx) - last_bins(1)) < min_dist_between_targets
+                    % 太近 → 不更新Target2
+                    range_tracks(m,id) = nan;
+                    miss_count(id) = miss_count(id) + 1;
+                    continue;
+                end
+                % 正常更新
+                last_bins(id)      = locs_sorted(idx);
                 range_tracks(m,id) = range_axis(locs_sorted(idx));
-                last_bins(id) = locs_sorted(idx);
-                used(idx) = true;
-                assigned = true;
-                miss_count(id) =0;
+                used(idx)          = true;
+                miss_count(id)     = 0;
             else
-                % no close detection
+                % miss
                 miss_count(id) = miss_count(id) + 1;
-                % range_tracks(m, id) = nan;
+
                 if miss_count(id) >= max_miss_allowed
-                    % range_tracks(m,id) = nan;
-                    % reinitialize after too many misses
-                    idx = find(~used,1,'first');
-                    if ~isempty(idx)
-                        range_tracks(m,id) = range_axis(locs_sorted(idx));
-                        last_bins(id) = locs_sorted(idx);
-                        used(idx) = true;
-                        assigned = true;
-                        miss_count(id) = 0; % reset after reinit
+                    % reinit，但仍然需要满足运动门限
+                    diffs = abs(locs_sorted - last_bins(id));
+                    [min_diff2, idx2] = min(diffs);
+                    if min_diff2 <= max_mov_bin && ~used(idx2)
+                        last_bins(id)      = locs_sorted(idx2);
+                        range_tracks(m,id) = range_axis(locs_sorted(idx2));
+                        used(idx2)         = true;
+                        miss_count(id)     = 0;
                     else
-                        % still nothing → keep NaN this frame
                         range_tracks(m,id) = nan;
                     end
                 else
-                    % within allowed miss window → keep last bin, no update
                     range_tracks(m,id) = nan;
                 end
             end
         else
-            % first-time init (no history yet)
+            % 单个轨迹首次出现（另一条已初始化）
             idx = find(~used,1,'first');
             if ~isempty(idx)
+                % 同样加距离约束
+                if id == 2 && ~isnan(last_bins(1)) ...
+                        && abs(locs_sorted(idx) - last_bins(1)) < min_dist_between_targets
+                    range_tracks(m,id) = nan;
+                    continue;
+                end 
+                last_bins(id)      = locs_sorted(idx);
                 range_tracks(m,id) = range_axis(locs_sorted(idx));
-                last_bins(id) = locs_sorted(idx);
-                used(idx) = true;
-                miss_count(id) = 0;
+                used(idx)          = true;
+                miss_count(id)     = 0;
             end
         end
     end
 end
 
-% %% RM3 Hungarian Assignment
-% 
-% min_sep_bin  = 20;        % minimum bin separation within chirp
-% max_mov_bin  = 5;        % maximum movement allowed between chirps (bins)
-% max_miss_allowed = 10;
-% % tracker state
-% last_bins = nan(1, num_targets);   % track states (row of cost matrix)
-% miss_count = zeros(1, num_targets); % consecutive miss counter
-% 
-% for m = 1:M-1
-%     row_data = Y_2MTI_dB_half_norm(m,:);
-% 
-%     % Step 1: find separated peaks in this chirp
-%     [pks, locs] = findpeaks(row_data, ...
-%         'MinPeakDistance', min_sep_bin);
-% 
-%     if isempty(pks)
-%         continue;
-%     end
-% 
-%     % sort candidates by strength (descending)
-%     [~, order] = sort(pks,'descend');
-%     locs_sorted = locs(order); % detections (indices of bins)(columns of cost matrix)
-% 
-%     %% build cost matrix
-%     num_detections = numel(locs_sorted);
-%     costMatrix = Inf(num_targets, num_detections);
-% 
-%     for i = 1:num_targets
-%         if ~isnan(last_bins(i))
-%             for j=1:num_detections
-%                 diff = abs(last_bins(i) - locs_sorted(j));
-%                 if diff <= max_mov_bin
-%                     costMatrix(i, j) = diff; % smaller = better match
-%                 end
-%             end
-%         end
-%     end
-% 
-%     %% Hungarian assignment
-%     % assignments = Nx2 array [trackIdx, detectionIdx]
-%     % unassignedTracks = tracks with no assigned detection
-%     % unassignedDetections = detections left unused
-%     [assignments, unassignedTracks, unassignedDetections] = ...
-%         assignDetectionsToTracks(costMatrix, max_mov_bin);
-% 
-%     %% Update states
-%     for k = 1:size(assignments,1)
-%         id = assignment(k,1);
-%         idx = assignment(k,2);
-%         range_tracks(m,id) = range_axis(locs_sorted(idx));
-%         last_bins(id) = locs_sorted(idx);
-%         miss_count(id) = 0;
-%     end
-% end
 
-
-%% scatterer per chirp
+%% scatterer per chirp for single tracking
 [max_vals, idx_max] = max(Y_2MTI_dB_half_norm, [], 2); 
 
-% %% (1) Captured data & sync for chosen chirps
-% figure('Name','RM3_captured_target');
-% hold on;
-% for i = 1:length(chosen)
-%     m = chosen(i);
-%     seg_t = (start_idx(m):start_idx(m)+N-1)/Fs;
-%     seg_radar = radar_data(start_idx(m):start_idx(m)+N-1);
-%     seg_sync  = sync_data(start_idx(m):start_idx(m)+N-1);
-% 
-%     plot(seg_t, seg_radar,'b');
-%     plot(seg_t, seg_sync,'r');
-% end
-% xlabel('Time (s)'); ylabel('Amplitude');
-% title(sprintf('Radar Data & Sync (Chirps %d to %d)', chosen(1), chosen(end)));
-% grid on;
-% legend('Radar Backscatter','Sync Signal');
-% saveas(gcf,'FMCW_plots/RM3_captured_chosen.png');
-% 
-% %% (2) Overlay radar + sync for chosen chirps
-% figure('Name','RM3_overlay');
-% for i = 1:length(chosen)
-%     m = chosen(i);
-%     seg_t = (start_idx(m):start_idx(m)+N-1)/Fs;
-%     seg_radar = radar_data(start_idx(m):start_idx(m)+N-1);
-%     seg_sync  = sync_data(start_idx(m):start_idx(m)+N-1);
-% 
-%     yyaxis left
-%     plot(seg_t, seg_radar, 'b'); ylabel('Radar Data');
-%     yyaxis right
-%     plot(seg_t, seg_sync, 'r'); ylim([0 1]); ylabel('Sync Signal');
-% end
-% xlabel('Time (s)');
-% title(sprintf('Overlay Radar & Sync (Chirps %d to %d)', chosen(1), chosen(end)));
-% grid on;
-% saveas(gcf,'FMCW_plots/RM3_overlay_chosen.png');
+
+%% multi targets tracking
+%% (1) Captured data & sync (separate subplots)
+figure('Name','Captured Data & Sync (Separate)');
+t = (0:length(radar_data)-1)/Fs;
+
+subplot(2,1,1);
+plot(t, radar_data, 'b'); % 原始 radar data 用蓝色
+xlabel('Time (s)'); ylabel('Amplitude');
+title('Captured Radar Backscatter Data');
+grid on;
+% xlim([5 5.05]); % zoom in
+
+subplot(2,1,2);
+plot(t, sync_data, 'k'); % sync 用黑色
+xlabel('Time (s)'); ylabel('Amplitude');
+title('Captured Sync Signal');
+grid on;
+% xlim([2 2.05]); % zoom in
+
+saveas(gcf,'FMCW_plots/RM3_captured_backscatter.png');
+
+%% (2) Overlay radar + sync (parsed up-chirp)
+figure('Name','Overlay Radar & Sync (Parsed Up-Chirps)');
+hold on;
+% 找出 target1 和 target2 有效 chirp 索引
+idx_t1 = find(~isnan(range_tracks(:,1)));
+idx_t2 = find(~isnan(range_tracks(:,2)));
+% Target1: 红色
+for k = 1:length(idx_t1)
+    m = idx_t1(k);
+    seg_t = (start_idx(m):start_idx(m)+N-1)/Fs;
+    seg_radar = radar_data(start_idx(m):start_idx(m)+N-1);
+
+    yyaxis left
+    plot(seg_t, seg_radar, 'r-', 'LineWidth', 1); % Target1 红色实线
+end
+
+% Target2: 青色
+for k = 1:length(idx_t2)
+    m = idx_t2(k);
+    seg_t = (start_idx(m):start_idx(m)+N-1)/Fs;
+    seg_radar = radar_data(start_idx(m):start_idx(m)+N-1);
+
+    yyaxis left
+    plot(seg_t, seg_radar, 'c-', 'LineWidth', 1); % Target2 青色实线
+    
+end
+
+% Sync: 黑色虚线
+for k = 1:length(idx_t1)
+    m = idx_t1(k);
+    seg_t = (start_idx(m):start_idx(m)+N-1)/Fs;
+    seg_sync  = sync_data(start_idx(m):start_idx(m)+N-1);
+
+    yyaxis right
+    plot(seg_t, seg_sync, 'k--', 'LineWidth', 1); % Sync 黑虚线
+end
+
+ylabel('Radar Data (Target1=Red, Target2=Cyan)');
+yyaxis right; ylabel('Sync Signal');
+xlabel('Time (s)');
+title('Overlay Radar & Sync (Parsed Up-Chirps)');
+grid on;
+% xlim([5 5.05]); % zoom in
+saveas(gcf,'FMCW_plots/RM3_captured_targets_backscatter.png');
+
+
 
 %% (3) Range vs Time (all strongest scatterers track)
 figure('Name','RM3_range_vs_time');
@@ -313,7 +324,7 @@ title(sprintf('Range vs Time (%d Strongest Scatterers)', num_targets));
 legend_strings = arrayfun(@(k) sprintf('Target %d',k),1:num_targets,'UniformOutput',false);
 legend(legend_strings);
 grid on;
-saveas(gcf,'FMCW_plots/RM3_time_vs_range_multi.png');  % file renamed
+saveas(gcf,'FMCW_plots/RM3_time_vs_range_two_targets.png');  
 
 
 %% (4) Range-Time Spectrogram + strongest target
@@ -324,7 +335,7 @@ axis xy; colorbar;
 set(gca,'YDir','reverse');
 xlabel('Range (m)'); 
 ylabel('Time (s)');
-xlim([0 60]);
+xlim([0 40]);
 
 title(sprintf('Range-Time Spectrogram with %d Targets', num_targets));
 hold on;
@@ -335,4 +346,4 @@ if num_targets >= 2
 end
 
 legend(legend_strings);
-saveas(gcf,'FMCW_plots/RM3_time_vs_range_multi.png');
+saveas(gcf,'FMCW_plots/RM3_time_vs_range__two_targets.png');
