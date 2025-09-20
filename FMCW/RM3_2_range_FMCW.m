@@ -6,7 +6,7 @@ clear;
 clc;
 
 %% Read data
-[data, Fs] = audioread("TEST_FILES_19/FMCW_19_t2_1.wav");
+[data, Fs] = audioread("TEST_FILES18/fmcw_18_t1.wav");
 
 % constants
 Tp = 5e-3;            % s
@@ -116,21 +116,16 @@ title('Range [upc] with MS and 2-pulse MTI, Tp=5ms, fstart=2.405GHz, fstop=2.495
 saveas(gcf, 'FMCW_plots/RM3_2_range_FMCW.png');
 
 
-
-%% RM3
-%% choose chirps and number of targets
-chosen = 10:30;   % change here
-
 %% RM3 with tracking
 %% --------- Tracking (Nearest Neighbor with gated re-init, bin version) ----------
-num_targets = 2;
+num_targets = 1;
 range_tracks = nan(M-1, num_targets);
 
 % 用 bin 直接设置参数
 min_sep_bin  = 20;     % 峰最小分离，bin
 max_mov_bin  = 10;      % 相邻帧最大移动，bin
 max_miss_allowed = 10;  % 可调，小一些让轨迹更稳
-threshold_dB = -25;
+threshold_dB = -35;
 min_dist_between_targets = 5; % minimum distance between targets in bins
 % tracker state
 last_bins  = nan(1, num_targets);
@@ -251,14 +246,14 @@ plot(t, radar_data, 'b'); % 原始 radar data 用蓝色
 xlabel('Time (s)'); ylabel('Amplitude');
 title('Captured Radar Backscatter Data');
 grid on;
-% xlim([5 5.05]); % zoom in
+xlim([5 5.05]); % zoom in
 
 subplot(2,1,2);
 plot(t, sync_data, 'k'); % sync 用黑色
 xlabel('Time (s)'); ylabel('Amplitude');
 title('Captured Sync Signal');
 grid on;
-% xlim([2 2.05]); % zoom in
+xlim([2 2.05]); % zoom in
 
 saveas(gcf,'FMCW_plots/RM3_captured_backscatter.png');
 
@@ -267,7 +262,7 @@ figure('Name','Overlay Radar & Sync (Parsed Up-Chirps)');
 hold on;
 % 找出 target1 和 target2 有效 chirp 索引
 idx_t1 = find(~isnan(range_tracks(:,1)));
-idx_t2 = find(~isnan(range_tracks(:,2)));
+% idx_t2 = find(~isnan(range_tracks(:,2)));
 % Target1: 红色
 for k = 1:length(idx_t1)
     m = idx_t1(k);
@@ -278,16 +273,16 @@ for k = 1:length(idx_t1)
     plot(seg_t, seg_radar, 'r-', 'LineWidth', 1); % Target1 红色实线
 end
 
-% Target2: 青色
-for k = 1:length(idx_t2)
-    m = idx_t2(k);
-    seg_t = (start_idx(m):start_idx(m)+N-1)/Fs;
-    seg_radar = radar_data(start_idx(m):start_idx(m)+N-1);
-
-    yyaxis left
-    plot(seg_t, seg_radar, 'c-', 'LineWidth', 1); % Target2 青色实线
-    
-end
+% % Target2: 青色
+% for k = 1:length(idx_t2)
+%     m = idx_t2(k);
+%     seg_t = (start_idx(m):start_idx(m)+N-1)/Fs;
+%     seg_radar = radar_data(start_idx(m):start_idx(m)+N-1);
+% 
+%     yyaxis left
+%     plot(seg_t, seg_radar, 'c-', 'LineWidth', 1); % Target2 青色实线
+% 
+% end
 
 % Sync: 黑色虚线
 for k = 1:length(idx_t1)
@@ -304,8 +299,8 @@ yyaxis right; ylabel('Sync Signal');
 xlabel('Time (s)');
 title('Overlay Radar & Sync (Parsed Up-Chirps)');
 grid on;
-% xlim([5 5.05]); % zoom in
-saveas(gcf,'FMCW_plots/RM3_captured_targets_backscatter.png');
+xlim([5 5.05]); % zoom in
+saveas(gcf,'FMCW_plots/RM3_captured_target_backscatter.png');
 
 
 
@@ -324,7 +319,7 @@ title(sprintf('Range vs Time (%d Strongest Scatterers)', num_targets));
 legend_strings = arrayfun(@(k) sprintf('Target %d',k),1:num_targets,'UniformOutput',false);
 legend(legend_strings);
 grid on;
-saveas(gcf,'FMCW_plots/RM3_time_vs_range_two_targets.png');  
+saveas(gcf,'FMCW_plots/RM3_time_vs_range_one_targets.png');  
 
 
 %% (4) Range-Time Spectrogram + strongest target
@@ -346,4 +341,4 @@ if num_targets >= 2
 end
 
 legend(legend_strings);
-saveas(gcf,'FMCW_plots/RM3_time_vs_range__two_targets.png');
+saveas(gcf,'FMCW_plots/RM3_time_vs_range__one_targets.png');
