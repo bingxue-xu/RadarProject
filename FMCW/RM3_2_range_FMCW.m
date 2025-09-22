@@ -314,7 +314,7 @@ title(sprintf('Range vs Time (%d Strongest Scatterers)', num_targets));
 legend_strings = arrayfun(@(k) sprintf('Target %d',k),1:num_targets,'UniformOutput',false);
 legend(legend_strings);
 grid on;
-saveas(gcf,'FMCW_plots/RM3_time_vs_range_one_targets.png');  
+saveas(gcf,'FMCW_plots/RM3_time_vs_range_two_targets.png');  
 
 
 %% (4) Range-Time Spectrogram + strongest target
@@ -336,4 +336,4 @@ if num_targets >= 2
 end
 
 legend(legend_strings);
-saveas(gcf,'FMCW_plots/RM3_time_vs_range__one_targets.png');
+saveas(gcf,'FMCW_plots/RM3_time_vs_range__two_targets.png');
