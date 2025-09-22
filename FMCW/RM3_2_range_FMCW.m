@@ -6,7 +6,7 @@ clear;
 clc;
 
 %% Read data
-[data, Fs] = audioread("TEST_FILES18/fmcw_18_t1.wav");
+[data, Fs] = audioread("TEST_FILES_19/FMCW_19_t2_1.wav");
 
 % constants
 Tp = 5e-3;            % s
@@ -118,37 +118,33 @@ saveas(gcf, 'FMCW_plots/RM3_2_range_FMCW.png');
 
 %% RM3 with tracking
 %% --------- Tracking (Nearest Neighbor with gated re-init, bin version) ----------
-num_targets = 1;
+num_targets = 2;
 range_tracks = nan(M-1, num_targets);
 
-% 用 bin 直接设置参数
-min_sep_bin  = 20;     % 峰最小分离，bin
-max_mov_bin  = 10;      % 相邻帧最大移动，bin
-max_miss_allowed = 10;  % 可调，小一些让轨迹更稳
-threshold_dB = -35;
+min_sep_bin  = 20;     % bin
+max_mov_bin  = 10;      % bin
+max_miss_allowed = 10;  
+threshold_dB = -25;
 min_dist_between_targets = 5; % minimum distance between targets in bins
 % tracker state
 last_bins  = nan(1, num_targets);
 miss_count = zeros(1, num_targets);
 
 for m = 1:M-1
-    % —— 行内归一化 + 自适应阈值（相对本行最大值）——
-    row = Y_2MTI_dB_half_norm(m,:);  % 已经归一化过（全局）
+    row = Y_2MTI_dB_half_norm(m,:);  % global
 
     % Step 1: find separated peaks in this chirp
     [pks, locs] = findpeaks(row, 'MinPeakDistance', min_sep_bin);
 
-    % 只保留超过阈值的峰
     valid = pks > threshold_dB;
     pks = pks(valid);  locs = locs(valid);
 
     if isempty(pks)
-        % 本帧无有效探测
         miss_count = miss_count + 1;
         continue;
     end
 
-    % 如果目标数少于 num_targets，就只跟踪实际数量
+    % only track captured num <= targets num
     num_detections = numel(pks);
     num_to_assign = min(num_targets, num_detections);
 
@@ -159,7 +155,7 @@ for m = 1:M-1
 
     used = false(size(locs_sorted));
 
-    % 初始化：拿前 num_targets 个强峰
+    % init：top num_targets pks
     if all(isnan(last_bins))
         for id = 1:num_targets
             if id <= num_to_assign
@@ -172,22 +168,22 @@ for m = 1:M-1
         continue;
     end
 
-    % 更新 / reinit
+    % reinit
     for id = 1:num_targets
         if ~isnan(last_bins(id))
             diffs = abs(locs_sorted - last_bins(id));
             [min_diff, idx] = min(diffs);
 
             if min_diff <= max_mov_bin && ~used(idx)
-                % 检查和另一个目标的距离
+                % check two targets distance
                 if id == 2 && ~isnan(last_bins(1)) ...
                         && abs(locs_sorted(idx) - last_bins(1)) < min_dist_between_targets
-                    % 太近 → 不更新Target2
+                    % too close → no update on Target2
                     range_tracks(m,id) = nan;
                     miss_count(id) = miss_count(id) + 1;
                     continue;
                 end
-                % 正常更新
+                % update
                 last_bins(id)      = locs_sorted(idx);
                 range_tracks(m,id) = range_axis(locs_sorted(idx));
                 used(idx)          = true;
@@ -197,7 +193,7 @@ for m = 1:M-1
                 miss_count(id) = miss_count(id) + 1;
 
                 if miss_count(id) >= max_miss_allowed
-                    % reinit，但仍然需要满足运动门限
+                    % reinit，check mov gate still
                     diffs = abs(locs_sorted - last_bins(id));
                     [min_diff2, idx2] = min(diffs);
                     if min_diff2 <= max_mov_bin && ~used(idx2)
@@ -213,10 +209,10 @@ for m = 1:M-1
                 end
             end
         else
-            % 单个轨迹首次出现（另一条已初始化）
+            % new target
             idx = find(~used,1,'first');
             if ~isempty(idx)
-                % 同样加距离约束
+                % check distance
                 if id == 2 && ~isnan(last_bins(1)) ...
                         && abs(locs_sorted(idx) - last_bins(1)) < min_dist_between_targets
                     range_tracks(m,id) = nan;
@@ -242,14 +238,14 @@ figure('Name','Captured Data & Sync (Separate)');
 t = (0:length(radar_data)-1)/Fs;
 
 subplot(2,1,1);
-plot(t, radar_data, 'b'); % 原始 radar data 用蓝色
+plot(t, radar_data, 'b'); % radar data blue
 xlabel('Time (s)'); ylabel('Amplitude');
 title('Captured Radar Backscatter Data');
 grid on;
 xlim([5 5.05]); % zoom in
 
 subplot(2,1,2);
-plot(t, sync_data, 'k'); % sync 用黑色
+plot(t, sync_data, 'k'); % sync black
 xlabel('Time (s)'); ylabel('Amplitude');
 title('Captured Sync Signal');
 grid on;
@@ -260,38 +256,37 @@ saveas(gcf,'FMCW_plots/RM3_captured_backscatter.png');
 %% (2) Overlay radar + sync (parsed up-chirp)
 figure('Name','Overlay Radar & Sync (Parsed Up-Chirps)');
 hold on;
-% 找出 target1 和 target2 有效 chirp 索引
 idx_t1 = find(~isnan(range_tracks(:,1)));
-% idx_t2 = find(~isnan(range_tracks(:,2)));
-% Target1: 红色
+idx_t2 = find(~isnan(range_tracks(:,2)));
+% Target1: red
 for k = 1:length(idx_t1)
     m = idx_t1(k);
     seg_t = (start_idx(m):start_idx(m)+N-1)/Fs;
     seg_radar = radar_data(start_idx(m):start_idx(m)+N-1);
 
     yyaxis left
-    plot(seg_t, seg_radar, 'r-', 'LineWidth', 1); % Target1 红色实线
+    plot(seg_t, seg_radar, 'r-', 'LineWidth', 1); %  
 end
 
-% % Target2: 青色
-% for k = 1:length(idx_t2)
-%     m = idx_t2(k);
-%     seg_t = (start_idx(m):start_idx(m)+N-1)/Fs;
-%     seg_radar = radar_data(start_idx(m):start_idx(m)+N-1);
-% 
-%     yyaxis left
-%     plot(seg_t, seg_radar, 'c-', 'LineWidth', 1); % Target2 青色实线
-% 
-% end
+% Target2: cyan
+for k = 1:length(idx_t2)
+    m = idx_t2(k);
+    seg_t = (start_idx(m):start_idx(m)+N-1)/Fs;
+    seg_radar = radar_data(start_idx(m):start_idx(m)+N-1);
 
-% Sync: 黑色虚线
+    yyaxis left
+    plot(seg_t, seg_radar, 'c-', 'LineWidth', 1); 
+
+end
+
+% Sync: black
 for k = 1:length(idx_t1)
     m = idx_t1(k);
     seg_t = (start_idx(m):start_idx(m)+N-1)/Fs;
     seg_sync  = sync_data(start_idx(m):start_idx(m)+N-1);
 
     yyaxis right
-    plot(seg_t, seg_sync, 'k--', 'LineWidth', 1); % Sync 黑虚线
+    plot(seg_t, seg_sync, 'k-', 'LineWidth', 1);  
 end
 
 ylabel('Radar Data (Target1=Red, Target2=Cyan)');
