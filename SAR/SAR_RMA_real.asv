@@ -305,24 +305,24 @@ data_hann = data_matrix .* H;
 % ylabel('Amplitude');
 % grid on;
 
-% %% Compare full data matrices (imagesc)
-% figure;
-% subplot(1,2,1);
-% imagesc(abs(data_matrix));
-% title('Data Matrix (no Hann window)');
-% xlabel('Fast-time samples (N_s)');
-% ylabel('Rail position'); colorbar;
-% 
-% subplot(1,2,2);
-% imagesc(abs(data_hann));
-% title('Data Matrix (with Hann window)');
-% xlabel('Fast-time samples (N_s)');
-% ylabel('Rail position'); colorbar;
+%% Compare full data matrices (imagesc)
+figure;
+subplot(1,2,1);
+imagesc(abs(data_matrix));
+title('Data Matrix (no Hann window)');
+xlabel('Fast-time samples (N_s)');
+ylabel('Rail position'); colorbar;
+
+subplot(1,2,2);
+imagesc(abs(data_hann));
+title('Data Matrix (with Hann window)');
+xlabel('Fast-time samples (N_s)');
+ylabel('Rail position'); colorbar;
 
 
 %% 8. Setting parameters
 t = linspace(0, Tp, N/2);
-L = spacing * size(data_hann, 1);
+L = spacing * size(data_matrix, 1);
 x_p = linspace(-L/2, L/2, L/spacing);
 
 %% 9. Generate kt
@@ -341,7 +341,7 @@ k_t = (2*pi*f_c)/c + (2*pi*BW*t)/(Tp*c);
 %% 11. zero padding
 num_zero = 2049;
 zeros_matrix = zeros(num_zero, N/2);
-data2_matrix = [zeros_matrix;data_hann;zeros_matrix];
+data2_matrix = [zeros_matrix;data_matrix;zeros_matrix];
 
 %% 12. update L and xp
 L = spacing * size(data2_matrix, 1);
@@ -423,29 +423,21 @@ crossrange = linspace(c_range_1, c_range_2, size(truncated_data_matrix, 2));
 %% 26. Column multiplication
 truncated2_data_matrix = truncated_data_matrix .* ((downrange.^2)');
 
-% %% 27. dB conversion and plot
-% image = 20*log10(abs(truncated2_data_matrix));
-% figure()
-% imagesc(crossrange, downrange, image, [max(max(image))-25, max(max(image))+0]);
-% colorbar;
-% set(gca,'YDir','reverse');
-
-%% RM4 3f. Show results with and without multiplication of the down range data with the square of the down range vector.
-image_no_comp = 20*log10(abs(truncated_data_matrix));
+%% 27. dB conversion and plot
 image = 20*log10(abs(truncated2_data_matrix));
 figure()
-subplot(1,2,1);
-imagesc(crossrange, downrange, image_no_comp, [max(max(image_no_comp))-25, max(max(image_no_comp))+0]);
+subplot(2,1,1);
+imagesc(crossrange, downrange, image, [max(max(image))-25, max(max(image))+0]);
 colorbar;
 set(gca,'YDir','reverse');
 xlabel('Crossrange (meter)');
 ylabel('Downrange (meter)');
 title('Final Image no R^2 compensation');
 
-subplot(1,2,2);
+subplot(2,1,2);
 imagesc(crossrange, downrange, image, [max(max(image))-25, max(max(image))+0]);
 colorbar;
 set(gca,'YDir','reverse');
 xlabel('Crossrange (meter)');
 ylabel('Downrange (meter)');
-title('Final Image with R^2 compensation');
+title('Final Image');
