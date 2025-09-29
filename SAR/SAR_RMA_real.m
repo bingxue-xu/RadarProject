@@ -423,29 +423,29 @@ crossrange = linspace(c_range_1, c_range_2, size(truncated_data_matrix, 2));
 %% 26. Column multiplication
 truncated2_data_matrix = truncated_data_matrix .* ((downrange.^2)');
 
-% %% 27. dB conversion and plot
-% image = 20*log10(abs(truncated2_data_matrix));
-% figure()
-% imagesc(crossrange, downrange, image, [max(max(image))-25, max(max(image))+0]);
-% colorbar;
-% set(gca,'YDir','reverse');
-
-%% RM4 3f. Show results with and without multiplication of the down range data with the square of the down range vector.
-image_no_comp = 20*log10(abs(truncated_data_matrix));
+%% 27. dB conversion and plot
 image = 20*log10(abs(truncated2_data_matrix));
 figure()
-subplot(1,2,1);
-imagesc(crossrange, downrange, image_no_comp, [max(max(image_no_comp))-25, max(max(image_no_comp))+0]);
-colorbar;
-set(gca,'YDir','reverse');
-xlabel('Crossrange (meter)');
-ylabel('Downrange (meter)');
-title('Final Image no R^2 compensation');
-
-subplot(1,2,2);
 imagesc(crossrange, downrange, image, [max(max(image))-25, max(max(image))+0]);
 colorbar;
 set(gca,'YDir','reverse');
-xlabel('Crossrange (meter)');
-ylabel('Downrange (meter)');
-title('Final Image with R^2 compensation');
+
+% %% RM4 3f. Show results with and without multiplication of the down range data with the square of the down range vector.
+% image_no_comp = 20*log10(abs(truncated_data_matrix));
+% image = 20*log10(abs(truncated2_data_matrix));
+% figure()
+% subplot(1,2,1);
+% imagesc(crossrange, downrange, image_no_comp, [max(max(image_no_comp))-25, max(max(image_no_comp))+0]);
+% colorbar;
+% set(gca,'YDir','reverse');
+% xlabel('Crossrange (meter)');
+% ylabel('Downrange (meter)');
+% title('Final Image no R^2 compensation');
+% 
+% subplot(1,2,2);
+% imagesc(crossrange, downrange, image, [max(max(image))-25, max(max(image))+0]);
+% colorbar;
+% set(gca,'YDir','reverse');
+% xlabel('Crossrange (meter)');
+% ylabel('Downrange (meter)');
+% title('Final Image with R^2 compensation');
