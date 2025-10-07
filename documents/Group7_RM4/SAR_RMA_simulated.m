@@ -1,0 +1,113 @@
+%% Cleaning
+clear
+clc
+
+%% Radar values
+
+fstart = 2.4e9;
+fend = 2.5e9;
+bw = fend - fstart;
+Fs = 50e3;
+Tp = 5e-3;
+N = Tp*Fs;
+fc = (fend + fstart)/2;
+t = linspace(0, Tp, N);
+c = 299792458;
+lambda = c/fc;
+spacing = lambda/2;
+deltaR = c/(2*bw);
+Rmax = deltaR*N/2;
+
+%% Positions
+
+x_pos = [-2050e-3 0e-3 2500e-3]; 
+y_pos = [0 0 0]; 
+z_pos = [10 20 30];
+
+xp = -3000e-3:spacing:3000e-3;
+yp = 0;
+
+%% Acquiring simulated targets and remove y dimension
+
+sim_targ = SAR_Data_Generation(x_pos, y_pos, z_pos, xp, yp, N, t, fc, bw, Tp);
+
+data = squeeze(sim_targ);
+
+%% Generating kx vector and then 2-D matrix
+
+deltakx = 2*pi/(2*max(xp));
+
+kx = deltakx*(-(size(xp,2)-1)/2:(size(xp,2)-1)/2);
+
+kx_2D = repmat(kx.',[1,N]);
+
+%% Generating kt 2-D matrix
+
+kt = 2*pi*fc/c + ((2*pi*bw)/(Tp*c))*t;
+
+kt_2D = repmat(kt, [size(xp,2),1]);
+
+%% Generate kx 2-D matrix
+
+kz_2D = (4*kt_2D.^2 - kx_2D.^2).^0.5;
+
+%% Generate uniform vector
+
+kz_1D_uni = linspace(min(min(kz_2D)), max(max(kz_2D)), size(kz_2D, 2));
+kz_2D_uni = repmat(kz_1D_uni, [size(xp,2),1]);
+
+%% Plotting k-space
+figure(1)
+scatter(kx_2D(1:10:end), kz_2D(1:10:end)); 
+hold on
+scatter(kx_2D(1:10:end), kz_2D_uni(1:10:end));
+xlabel('k_{x}');
+ylabel('k_{z}');
+
+%% FFT
+
+S_B = fftshift(fft(data,[],1),1);
+
+%% Stolt interpolation
+m = size(S_B, 1);
+n = size(S_B, 2);
+S_B2 = zeros(m,n);
+
+for i = 1:m
+    S_B2(i,:) = interp1(kz_2D(i,:), S_B(i,:), kz_1D_uni);
+    for j = 1:n
+        if isnan(S_B2(i,j))
+            S_B2(i,j) = 1e-30;
+        end
+    end
+end
+
+%% 2-D IFFT
+
+ft_1 = ifft(S_B2,[],1);
+ft_2 = ifft(ft_1,[],2);
+
+
+%% axis for final image and multiplication
+
+deltax = 2*pi/(2*max(kx));
+x_axis = deltax*(-(size(xp,2)-1)/2:(size(xp,2)-1)/2);
+
+deltafz = c*(max(kz_1D_uni)-min(kz_1D_uni))/(4*pi);
+Rmax = N*c/(4*deltafz);
+
+z_axis = linspace(0,Rmax,N/2);
+
+f_corrected = ft_2(:,1:size(ft_2,2)/2).* z_axis.^2;
+
+%% Plotting
+
+figure(2)
+imagesc(z_axis, x_axis,(abs(f_corrected/max(f_corrected(:)))), [0 1]);
+axis xy;
+colorbar;
+set(gca,'YDir','reverse');
+xlabel('Z (m)');
+ylabel('X (m)');
+title('SAR image, T_{p}=5ms, f_{start}=2.4GHz, f_{stop}=2.5GHz, F_{s}=50kHz');
+
