@@ -46,7 +46,7 @@ for m = 1:M
 end
 
 %% ---- PHASE DIFFERENCE & RANGE ESTIMATION ----
-dphi = angle(S2 .* conj(S1))+pi;          % (-0, 2*pi]
+dphi = angle(S2 .* conj(S1))+pi;          % (-pi, pi]
 R = (c * dphi) / (4 * pi * df);        % meters, within ±1.5 m
 Rmax = c / (4 * df);                   % 1.5 m for df=50 MHz
 
@@ -57,7 +57,6 @@ time_axis = (0:length(R)-1) * (2*Ts);  % one cycle = 2*Ts
 
 %% ---- PLOT RANGE OVER TIME ----
 figure();
-subplot(1,2,1)
 plot(time_axis, R, 'b.-','LineWidth',1.2);
 xlabel('Time (s)');
 xlim([0,20]);
@@ -66,29 +65,19 @@ title('SFCW Two-Step Range vs. Time (within 1.5 m window)');
 grid on;
 
 %% ---- PLOT RANGE OVER TIME ----
-subplot(1,2,2)
+figure;
 plot(time_axis, R, 'b.-','LineWidth',1.2);
 xlabel('Time (s)');
-xlim([10,11]);
+xlim([0,20]);
 ylabel('Estimated Range (m)');
 title('SFCW Two-Step Range vs. Time (within 1.5 m window)');
 grid on;
 
-% %% ---- OPTIONAL: unwrap if small motion causes ±π jumps ----
-% R_unwrapped = unwrap(dphi) * (c / (4*pi*df));
-% figure;
-% plot(time_axis, R_unwrapped, 'r.-');
-% xlabel('Time (s)');
-% ylabel('Unwrapped Range (m)');
-% title('Unwrapped Range (if motion crosses ±π)');
-% grid on;
-
+%% ---- OPTIONAL: unwrap if small motion causes ±π jumps ----
+R_unwrapped = unwrap(dphi) * (c / (4*pi*df));
 figure;
-plot(time_axis, mod(dphi, 2*pi), 'b.-');
+plot(time_axis, R_unwrapped, 'r.-');
 xlabel('Time (s)');
-xlim([0,20]);
-ylabel('Phase Difference (rad)');
-title('Phase Difference (wrapped 0–2π)');
+ylabel('Unwrapped Range (m)');
+title('Unwrapped Range (if motion crosses ±π)');
 grid on;
-ylim([0 2*pi]);
-
