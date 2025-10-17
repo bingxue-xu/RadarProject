@@ -29,16 +29,15 @@ x_pos = [-2050e-3 0e-3 2500e-3];
 y_pos = [0 0 0]; 
 z_pos = [10 20 30];
 
-xp = -6000e-3:spacing:6000e-3;
+xp = -3000e-3:spacing:3000e-3;
 yp = 0;
-% tic
+tic
 
 %% Acquiring simulated targets and remove y dimension
 sim_targ = SAR_Data_Generation(x_pos, y_pos, z_pos, xp, yp, N, t, fc, bw, Tp);
 
 data = squeeze(sim_targ);
 
-% data_gene_end = toc
 %% Generating kx vector and then 2-D matrix
 
 deltakx = 2*pi/(2*max(xp));
@@ -56,13 +55,11 @@ kt_2D = repmat(kt, [size(xp,2),1]);
 %% Generate kx 2-D matrix
 
 kz_2D = (4*kt_2D.^2 - kx_2D.^2).^0.5;
-% kx_kt_end = toc
 
 %% Generate uniform vector
 
 kz_1D_uni = linspace(min(min(kz_2D)), max(max(kz_2D)), size(kz_2D, 2));
 kz_2D_uni = repmat(kz_1D_uni, [size(xp,2),1]);
-% uniform_vetor_end = toc
 
 % %% Plotting k-space
 % figure(1)
@@ -73,14 +70,13 @@ kz_2D_uni = repmat(kz_1D_uni, [size(xp,2),1]);
 % ylabel('k_{z}');
 
 %% FFT
-% fft_start = toc
 S_B = fftshift(fft(data,[],1),1);
-% fft_end = toc
+
 %% Stolt interpolation
 m = size(S_B, 1);
 n = size(S_B, 2);
 S_B2 = zeros(m,n);
-tic
+
 for i = 1:m
     S_B2(i,:) = interp1(kz_2D(i,:), S_B(i,:), kz_1D_uni);
     for j = 1:n
@@ -90,13 +86,11 @@ for i = 1:m
     end
 end
 
-interpolation_end = toc
 %% 2-D IFFT
 
 ft_1 = ifft(S_B2,[],1);
 ft_2 = ifft(ft_1,[],2);
 
-ifft_end = toc
 %% axis for final image and multiplication
 
 deltax = 2*pi/(2*max(kx));
@@ -109,7 +103,6 @@ z_axis = linspace(0,Rmax,N/2);
 
 f_corrected = ft_2(:,1:size(ft_2,2)/2).* z_axis.^2;
 
-corrected_end = toc
 %% Plotting
 
 figure(2)
@@ -119,6 +112,7 @@ colorbar;
 set(gca,'YDir','reverse');
 xlabel('Z (m)');
 ylabel('X (m)');
-title('SAR image, T_{p}=5ms, f_{start}=5.4GHz, f_{stop}=5.5GHz, F_{s}=50kHz');
+title('SAR image, T_{p}=5ms, f_{start}=2.4GHz, f_{stop}=2.5GHz, F_{s}=50kHz');
+saveas(gcf, 'images/SAR_RMA_fc5.png');
 
-plot_end = toc
+toc

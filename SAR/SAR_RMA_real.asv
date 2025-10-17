@@ -8,9 +8,9 @@ clear
 clc
 
 % 1. load data
-load("./radar_data/radar_data.mat")
-load("./radar_data/sync_data.mat")
-load("./radar_data/Fs_data.mat")
+load("./radar_data/radar_4tables/radar_3tables.mat")
+load("./radar_data/radar_4tables/sync_3tables.mat")
+load("./radar_data/radar_4tables/Fs.mat")
 
 clearvars -except radar_data sync_data Fs
 
@@ -22,6 +22,9 @@ Tp = 5e-3;                     % Pulse/chirp duration (s)
 min_gap = round(Tp * Fs * 10); % Minimum number of consecutive zeros to count as a new position
 
 N = round(Tp * Fs);    % expected number of samples per upchirp
+if mod(N,2) ~= 0
+    N = N+1;
+end
 tolerance = 20;              % tolerance
 
 Nrp = round(0.5 * Fs);
@@ -286,26 +289,28 @@ x = linspace(-N/4, N/4, N/2);
 H = 0.5*(1 + cos(2*pi*x*(2/N)));
 data_hann = data_matrix .* H; 
 
-% % %% RM4 3e. Show results with and without using the Hann window.
-% i = 10;
-% t = 0:(N/2-1);
-% 
-% figure;
-% subplot(2,1,1);
-% plot(t, data_matrix(i,:));
-% title('Data from one row (before windowing)');
-% xlabel('Data Sample Number (N_s)');
-% ylabel('Amplitude');
-% grid on;
-% 
-% subplot(2,1,2);
-% plot(t, data_hann(i,:));
-% title('Data from one row (after windowoing)');
-% xlabel('Data Sample Number (N_s)');
-% ylabel('Amplitude');
-% grid on;
+% %% RM4 3e. Show results with and without using the Hann window.
+i = 10;
+t = 0:(N/2-1);
 
-%% Compare full data matrices (imagesc)
+figure;
+subplot(1,2,1);
+plot(t, data_matrix(i,:));
+title('Data from one row (before hann windowing)');
+xlabel('Data Sample Number (N_s)');
+ylabel('Amplitude');
+grid on;
+
+subplot(1,2,2);
+plot(t, data_hann(i,:));
+title('Data from one row (after hann windowoing)');
+xlabel('Data Sample Number (N_s)');
+ylabel('Amplitude');
+grid on;
+saveas(gcf, 'images/SAR_hann_plot.png');
+
+
+% Compare full data matrices (imagesc)
 figure;
 subplot(1,2,1);
 imagesc(abs(data_matrix));
@@ -318,11 +323,12 @@ imagesc(abs(data_hann));
 title('Data Matrix (with Hann window)');
 xlabel('Fast-time samples (N_s)');
 ylabel('Rail position'); colorbar;
+saveas(gcf, 'images/SAR_hann_matrices.png');
 
 
 %% 8. Setting parameters
 t = linspace(0, Tp, N/2);
-L = spacing * size(data_matrix, 1);
+L = spacing * size(data_hann, 1);
 x_p = linspace(-L/2, L/2, L/spacing);
 
 %% 9. Generate kt
@@ -341,8 +347,7 @@ k_t = (2*pi*f_c)/c + (2*pi*BW*t)/(Tp*c);
 %% 11. zero padding
 num_zero = 2049;
 zeros_matrix = zeros(num_zero, N/2);
-data2_matrix = [zeros_matrix;data_matrix;zeros_matrix];
-
+data2_matrix = [zeros_matrix;data_hann;zeros_matrix];
 %% 12. update L and xp
 L = spacing * size(data2_matrix, 1);
 x_p = linspace(-L/2, L/2, L/spacing);
@@ -367,7 +372,6 @@ k_z_2d_uni = repmat (k_z_1d_uni, [size(x_p,2),1]);
 %% 19. FFT
 %plot magnitude in dB and phase
 S_B = fftshift(fft(data2_matrix,[],1),1);
-
 % %% 20. Plot magnitude and phase
 % figure()
 % imagesc(k_t, k_x, 20*log10(abs(S_B)), [-15 20]);
@@ -378,7 +382,6 @@ S_B = fftshift(fft(data2_matrix,[],1),1);
 
 %% 21. Stolt interpolation
 S_B2 = zeros(size(S_B,1),N/2);
-
 for i = 1:size(S_B, 1)
     S_B2(i,:) = interp1(k_z_2d(i,:), S_B(i,:), k_z_1d_uni);
 end
@@ -426,18 +429,32 @@ truncated2_data_matrix = truncated_data_matrix .* ((downrange.^2)');
 %% 27. dB conversion and plot
 image = 20*log10(abs(truncated2_data_matrix));
 figure()
-subplot(2,1,1);
 imagesc(crossrange, downrange, image, [max(max(image))-25, max(max(image))+0]);
 colorbar;
 set(gca,'YDir','reverse');
 xlabel('Crossrange (meter)');
 ylabel('Downrange (meter)');
-title('Final Image no R^2 compensation');
+title('SAR Final Image');
+saveas(gcf, 'images/sar_hann.png');
 
-subplot(2,1,2);
-imagesc(crossrange, downrange, image, [max(max(image))-25, max(max(image))+0]);
-colorbar;
-set(gca,'YDir','reverse');
-xlabel('Crossrange (meter)');
-ylabel('Downrange (meter)');
-title('Final Image');
+%% RM4 3f. Show results with and without multiplication of the down range data with the square of the down range vector.
+% image_no_comp = 20*log10(abs(truncated_data_matrix));
+% image = 20*log10(abs(truncated2_data_matrix));
+% figure()
+% subplot(1,2,1);
+% imagesc(crossrange, downrange, image_no_comp, [max(max(image_no_comp))-25, max(max(image_no_comp))+0]);
+% colorbar;
+% set(gca,'YDir','reverse');
+% xlabel('Crossrange (meter)');
+% ylabel('Downrange (meter)');
+% title('Final Image no R^2 compensation');
+% saveas(gcf, 'images/SAR_REAL_no_R².png');
+% 
+% subplot(1,2,2);
+% imagesc(crossrange, downrange, image, [max(max(image))-25, max(max(image))+0]);
+% colorbar;
+% set(gca,'YDir','reverse');
+% xlabel('Crossrange (meter)');
+% ylabel('Downrange (meter)');
+% title('Final Image with R^2 compensation');
+% saveas(gcf, 'images/SAR_REAL_R².png');

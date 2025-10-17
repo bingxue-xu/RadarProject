@@ -128,7 +128,7 @@ blocks:
     bus_structure: null
     coordinate: [152, 352.0]
     rotation: 0
-    state: disabled
+    state: enabled
 - name: analog_sig_source_x_0_0
   id: analog_sig_source_x
   parameters:
@@ -151,7 +151,7 @@ blocks:
     bus_structure: null
     coordinate: [152, 904.0]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: blocks_complex_to_float_0
   id: blocks_complex_to_float
   parameters:
@@ -167,7 +167,7 @@ blocks:
     bus_structure: null
     coordinate: [744, 536.0]
     rotation: 0
-    state: disabled
+    state: enabled
 - name: blocks_complex_to_float_0_0
   id: blocks_complex_to_float
   parameters:
@@ -183,7 +183,7 @@ blocks:
     bus_structure: null
     coordinate: [1136, 1080.0]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: blocks_multiply_conjugate_cc_0
   id: blocks_multiply_conjugate_cc
   parameters:
@@ -199,7 +199,7 @@ blocks:
     bus_structure: null
     coordinate: [648, 1152.0]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: blocks_multiply_xx_0
   id: blocks_multiply_xx
   parameters:
@@ -215,7 +215,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [528, 1408.0]
+    coordinate: [664, 1056.0]
     rotation: 0
     state: disabled
 - name: blocks_wavfile_sink_0
@@ -239,7 +239,7 @@ blocks:
     bus_structure: null
     coordinate: [1120, 400.0]
     rotation: 0
-    state: disabled
+    state: enabled
 - name: blocks_wavfile_sink_0_0
   id: blocks_wavfile_sink
   parameters:
@@ -261,7 +261,7 @@ blocks:
     bus_structure: null
     coordinate: [1120, 576.0]
     rotation: 0
-    state: disabled
+    state: enabled
 - name: blocks_wavfile_sink_0_0_0
   id: blocks_wavfile_sink
   parameters:
@@ -283,7 +283,7 @@ blocks:
     bus_structure: null
     coordinate: [1360, 1128.0]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: blocks_wavfile_sink_0_1
   id: blocks_wavfile_sink
   parameters:
@@ -305,7 +305,7 @@ blocks:
     bus_structure: null
     coordinate: [1360, 952.0]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: dc_blocker_xx_0
   id: dc_blocker_xx
   parameters:
@@ -323,7 +323,7 @@ blocks:
     bus_structure: null
     coordinate: [440, 1084.0]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: filter_fft_low_pass_filter_1
   id: filter_fft_low_pass_filter
   parameters:
@@ -347,7 +347,7 @@ blocks:
     bus_structure: null
     coordinate: [864, 1020.0]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: note_0_0
   id: note
   parameters:
@@ -434,7 +434,7 @@ blocks:
     bus_structure: null
     coordinate: [1120, 300.0]
     rotation: 0
-    state: disabled
+    state: enabled
 - name: qtgui_waterfall_sink_x_0_0
   id: qtgui_waterfall_sink_x
   parameters:
@@ -495,7 +495,7 @@ blocks:
     bus_structure: null
     coordinate: [1120, 716.0]
     rotation: 0
-    state: disabled
+    state: enabled
 - name: qtgui_waterfall_sink_x_0_0_0
   id: qtgui_waterfall_sink_x
   parameters:
@@ -556,7 +556,7 @@ blocks:
     bus_structure: null
     coordinate: [1360, 1268.0]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: qtgui_waterfall_sink_x_0_1
   id: qtgui_waterfall_sink_x
   parameters:
@@ -617,7 +617,7 @@ blocks:
     bus_structure: null
     coordinate: [1360, 852.0]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: uhd_usrp_sink_0
   id: uhd_usrp_sink
   parameters:
@@ -894,7 +894,7 @@ blocks:
     bus_structure: null
     coordinate: [472, 344.0]
     rotation: 0
-    state: disabled
+    state: enabled
 - name: uhd_usrp_sink_0_0
   id: uhd_usrp_sink
   parameters:
@@ -1171,7 +1171,7 @@ blocks:
     bus_structure: null
     coordinate: [480, 896.0]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: uhd_usrp_source_0
   id: uhd_usrp_source
   parameters:
@@ -1607,7 +1607,7 @@ blocks:
     bus_structure: null
     coordinate: [152, 512.0]
     rotation: 0
-    state: disabled
+    state: enabled
 - name: uhd_usrp_source_0_0
   id: uhd_usrp_source
   parameters:
@@ -2043,7 +2043,7 @@ blocks:
     bus_structure: null
     coordinate: [152, 1064.0]
     rotation: 0
-    state: enabled
+    state: disabled
 
 connections:
 - [analog_sig_source_x_0, '0', uhd_usrp_sink_0, '0']
@@ -2068,4 +2068,4 @@ connections:
 
 metadata:
   file_format: 1
-  grc_version: 3.10.12.0
+  grc_version: 3.10.9.2

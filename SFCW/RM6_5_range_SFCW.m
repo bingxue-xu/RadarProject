@@ -12,8 +12,8 @@ Ts = 0.001;             % dwell time per frequency step (sec)
 % M  = 200;              % number of 2-step cycles
 
 %% ---- LOAD DATA ----
-[data_I, Fs] = audioread("cw_re_im_SFCW/cw_re_SFCW.wav");
-[data_Q, ~] = audioread("cw_re_im_SFCW/cw_im_SFCW.wav");
+[data_I, Fs] = audioread('cw_im_2steps/cw_re_2steps.wav');
+[data_Q, ~]  = audioread('cw_im_2steps/cw_im_2steps.wav');
 
 rx = data_I + 1j*data_Q;
 
@@ -26,7 +26,7 @@ t = (0:length(rx)-1)/Fs;
 samples_per_step = round(Ts*Fs);
 samples_per_cycle = N * samples_per_step;
 
-M = ceil(length(data_I)/N/2);
+M = floor(length(rx)/N/2);
 
 S1 = zeros(M,1);
 S2 = zeros(M,1);
@@ -44,6 +44,9 @@ for m = 1:M
     S1(m) = mean(rx(idx1));
     S2(m) = mean(rx(idx2));
 end
+
+S1 = S1 - mean(S1);
+S2 = S2 - mean(S2);   
 
 %% ---- PHASE DIFFERENCE & RANGE ESTIMATION ----
 dphi = angle(S2 .* conj(S1))+pi;          % (-0, 2*pi]
@@ -92,3 +95,39 @@ title('Phase Difference (wrapped 0–2π)');
 grid on;
 ylim([0 2*pi]);
 
+%% ---- Build IQ-Time Matrix ----
+IQ_matrix = [S1, S2];   % Each column = one frequency step (f1, f2)
+M = length(S1);
+
+%% ---- Plot Correctly ----
+figure;
+
+subplot(2,1,1);
+plot(real(S1), 'b'); hold on;
+plot(real(S2), 'r');
+title('Before Clutter Rejection');
+xlabel('Cycle index (time)');
+xlim([0, 10000]);
+ylabel('Amplitude');
+legend('f1','f2');
+grid on;
+
+subplot(2,1,2);
+imagesc(1:2, 1:M, abs(IQ_matrix));    % correct x-axis = 1..2
+xlabel('Frequency Step (f1 → f2)');
+ylabel('Cycle Index (Time)');
+title('IQ-Time Magnitude Matrix');
+colorbar;
+
+
+T = table((1:10)', real(S1(1:10)), imag(S1(1:10)), ...
+           real(S2(1:10)), imag(S2(1:10)), ...
+           'VariableNames', {'Cycle','I_f1','Q_f1','I_f2','Q_f2'});
+disp(T);
+
+dphi = angle(S2 .* conj(S1));
+R = (c * dphi) / (4 * pi * df);
+
+T_range = table((1:M)', R, dphi, ...
+    'VariableNames', {'Cycle','Range_m','Phase_rad'});
+disp(T_range(1:10,:));

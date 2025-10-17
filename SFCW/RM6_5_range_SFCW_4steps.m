@@ -17,8 +17,8 @@ Ts = 1e-3;
 M  = 5000;              % number of 2-step cycles
 
 %% ---- LOAD DATA ----
-[data_I, Fs] = audioread('tests/cw_re_4steps_lasttest_3m.wav');
-[data_Q, ~]  = audioread('tests/cw_im_4steps_lasttest_3m.wav');
+[data_I, Fs] = audioread('cw_im_4steps_lasttest/cw_re_4steps_lasttest_3m.wav');
+[data_Q, ~]  = audioread('cw_im_4steps_lasttest/cw_im_4steps_lasttest_3m.wav');
 
 rx = data_I + 1j*data_Q;
 

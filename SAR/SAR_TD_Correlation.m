@@ -9,8 +9,8 @@ clc
 
 %% Radar values
 
-fstart = 2.4e9;
-fend = 2.5e9;
+fstart = 5.4e9;
+fend = 5.5e9;
 bw = fend - fstart;
 Fs = 50e3;
 Tp = 5e-3;
@@ -27,7 +27,7 @@ Rmax = deltaR*N/2;
 
 x_pos = [-2050e-3 0e-3 2500e-3]; 
 y_pos = [0 0 0]; 
-z_pos = [10 20 30];
+z_pos = [10 50 90];
 
 xp = -3000e-3:spacing:3000e-3;
 yp = 0;
@@ -74,6 +74,7 @@ colorbar;
 set(gca,'YDir','reverse');
 xlabel('Z Down Range (m)');
 ylabel('X Cross Range (m)');
-title('SAR image, T_{p}=5ms, f_{start}=2.4GHz, f_{stop}=2.5GHz, F_{s}=50kHz');
+title('SAR image, T_{p}=5ms, f_{start}=5.4GHz, f_{stop}=5.5GHz, F_{s}=50kHz');
+saveas(gcf, 'images/SAR_fc.png');
 
 
